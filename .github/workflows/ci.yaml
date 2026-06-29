@@ -1,0 +1,106 @@
+# CI Workflow for Testing, Linting, and Building Docker Image
+
+name: Test, Lint & Build
+
+on:
+  pull_request:
+    branches: [main, dev]
+
+  push:
+    branches: [main, dev]
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: "1.25"
+
+      - name: Run Tests
+        run: go test ./test/... -v -cover
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: "1.25"
+
+      - name: Go Vet
+        run: go vet ./...
+
+      - name: Go Fmt
+        run: |
+          if [ "$(gofmt -s -l . | wc -l)" -gt 0 ]; then
+            echo "Code is not formatted. Run 'gofmt -s -w .'"
+            gofmt -s -l .
+            exit 1
+          fi
+
+  build:
+    needs: [test, lint]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and Push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/ademayowa/events-app:${{ github.ref_name }}
+          cache-from: type=registry,ref=ghcr.io/ademayowa/events-app:buildcache
+          cache-to: type=registry,ref=ghcr.io/ademayowa/events-app:buildcache,mode=max
+
+  update-manifest:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+
+      - name: Update values-dev.yaml
+        run: |
+          sed -i -E 's|(^\s*tag:\s*).*|\1${{ github.ref_name }}|' infra/helm/events-app-chart/values-dev.yaml
+
+      - name: Commit and Push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add infra/helm/events-app-chart/values-dev.yaml
+
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+
+          git commit -m "chore: update dev image to ${{ github.ref_name }} [skip ci]"
+
+          git push origin main
