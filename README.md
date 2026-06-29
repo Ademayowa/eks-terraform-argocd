@@ -1,1 +1,1 @@
-# Events App - AWS EKS</h2>
+# AWS EKS With Terraform & ArgoCD</h2>
