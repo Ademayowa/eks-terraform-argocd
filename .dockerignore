@@ -1,0 +1,27 @@
+# Docker files 
+Dockerfile
+.dockerignore
+
+# Git 
+.git
+.gitignore
+.gitattributes
+
+# Documentation 
+README.md
+*.md
+docs/
+LICENSE
+
+# CI/CD configs 
+.github/
+.gitlab-ci.yml
+.travis.yml
+Makefile
+
+# Test and coverage files 
+*_test.go
+testdata/
+coverage.txt
+coverage.html
+coverage.out
