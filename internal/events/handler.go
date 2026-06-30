@@ -23,7 +23,7 @@ func (h *Handler) Create(c *gin.Context) {
 
 	event, err := h.svc.CreateEvent(c.Request.Context(), req)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error" + err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
 
